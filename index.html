@@ -72,10 +72,10 @@
   .card h2 .hint{text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);font-size:11.5px;margin-left:6px}
   .twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:14px}
   .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;position:relative;overflow:hidden}
   .stat .tick{position:absolute;top:0;left:0;width:3px;height:100%;background:var(--muted)}
-  .stat.a .tick{background:var(--save)} .stat.b .tick{background:var(--in)} .stat.c .tick{background:var(--out)}
+  .stat.a .tick{background:var(--save)} .stat.b .tick{background:var(--in)} .stat.c .tick{background:var(--out)} .stat.d .tick{background:#7FC2E5}
   .stat .cap{font-size:10.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}
   .stat .val{font-family:var(--mono);font-size:clamp(18px,4vw,24px);font-weight:600;margin-top:8px;letter-spacing:-.02em}
   .stat .sub{font-size:11.5px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
@@ -162,7 +162,28 @@
   .toolbtns{display:flex;gap:10px;flex-wrap:wrap}
   .filechip{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
 
-  /* modal */
+  /* ---- polish ---- */
+  ::selection{background:rgba(84,201,164,.26);color:var(--ink)}
+  .card{box-shadow:0 1px 0 rgba(255,255,255,.015), 0 14px 30px -26px rgba(0,0,0,.7);transition:border-color .2s ease, box-shadow .2s ease}
+  /* le chiffre-clé : la signature de la page */
+  .hero .total{background:linear-gradient(176deg,#F2F7F3 0%,#AFC4BB 120%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:2px}
+  .hero .cap{font-weight:500}
+  /* tuiles : légère élévation + reflet discret */
+  .stat{transition:border-color .2s ease, transform .2s ease, box-shadow .2s ease}
+  .stat::after{content:"";position:absolute;inset:0;background:radial-gradient(140px 70px at 100% 0,rgba(255,255,255,.035),transparent 70%);pointer-events:none}
+  .stat:hover{transform:translateY(-2px);border-color:#33423d;box-shadow:0 16px 34px -26px rgba(0,0,0,.85)}
+  /* lignes cliquables : affordance claire */
+  .holdrow{border-radius:11px;padding:12px 8px 12px 10px;transition:background .16s ease, transform .16s ease, box-shadow .16s ease}
+  .holdrow:hover{background:var(--surface-2);transform:translateX(3px);box-shadow:inset 0 0 0 1px var(--line)}
+  .holdrow .del{transition:transform .16s ease, color .16s ease}
+  .holdrow:hover .del{color:var(--save);transform:translateX(3px)}
+  /* onglet actif : accent menthe */
+  .rail button[aria-selected="true"]{color:var(--save)}
+  /* accessibilité clavier (plancher qualité) */
+  .btn:focus-visible,.mini:focus-visible,.rail button:focus-visible,.monthnav button:focus-visible,.seg-toggle button:focus-visible,.gbtn:focus-visible{outline:2px solid var(--save);outline-offset:2px}
+  a:focus-visible{outline:2px solid var(--save);outline-offset:3px;border-radius:5px}
+  .holdrow:focus-visible{outline:2px solid var(--save);outline-offset:2px}
+
   .modal{position:fixed;inset:0;background:rgba(4,8,7,.7);display:none;align-items:flex-start;justify-content:center;padding:24px 14px;z-index:50;overflow:auto}
   .modal.open{display:flex}
   .modal .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:680px;width:100%;margin:auto}
@@ -269,6 +290,7 @@
   <section class="panel active" id="patrimoine">
     <div class="stats">
       <div class="stat a"><span class="tick"></span><div class="cap">Valeur actuelle</div><div class="val num" id="kVal">—</div><div class="sub" id="kValSub"></div></div>
+      <div class="stat d"><span class="tick"></span><div class="cap">Variation du jour</div><div class="val num" id="kDay">—</div><div class="sub" id="kDaySub"></div></div>
       <div class="stat b"><span class="tick"></span><div class="cap">Total investi</div><div class="val num" id="kInv">—</div><div class="sub">apports cumulés</div></div>
       <div class="stat c"><span class="tick"></span><div class="cap">Plus / moins-value</div><div class="val num" id="kPv">—</div><div class="sub" id="kPvSub"></div></div>
     </div>
@@ -280,10 +302,14 @@
       <div id="histChart"></div>
     </div>
     <div class="twocol">
+      <div class="card"><h2>Top mouvements du jour</h2><div id="movers"></div></div>
+      <div class="card"><h2>Répartition géographique</h2><div id="byGeo"></div></div>
+    </div>
+    <div class="twocol">
       <div class="card"><h2>Répartition par plateforme</h2><div id="byPlatform"></div></div>
       <div class="card"><h2>Répartition par classe d'actif</h2><div id="byClass"></div></div>
     </div>
-    <div class="card"><h2>Mes lignes (les plus grosses d'abord)</h2><div id="topHoldings"></div></div>
+    <div class="card"><h2>Plus grosses positions <span class="hint">— top 5 ; détail complet dans Placements</span></h2><div id="topHoldings"></div></div>
   </section>
 
   <!-- PLACEMENTS -->
@@ -696,6 +722,46 @@
       e.textContent=(d.pv>=0?'▲ ':'▼ ')+money(Math.abs(d.pv))+'  ('+pctF.format(d.pvPct)+')';}
     else{e.className='pv num';e.style.color='var(--muted)';e.textContent='ajoute tes placements pour voir ta performance';}
   }
+  function geoOf(h){
+    if(h.coinId)return 'Crypto';
+    const t=(h.ticker||'').toUpperCase();
+    if(t){
+      if(t.endsWith('.PA'))return 'France';
+      if(t.endsWith('.T'))return 'Japon';
+      if(t.endsWith('.HK'))return 'Chine / HK';
+      if(t.endsWith('.TW'))return 'Taïwan';
+      if(t.endsWith('.DE')||t.endsWith('.F'))return 'Allemagne';
+      if(t.endsWith('.L'))return 'Royaume-Uni';
+      if(t.endsWith('.MI'))return 'Italie';
+      if(t.endsWith('.AS'))return 'Pays-Bas';
+      if(t.endsWith('.SW'))return 'Suisse';
+      if(/\.[A-Z]{1,3}$/.test(t))return 'International';
+      return 'États-Unis';
+    }
+    const c=(h.assetClass||'').toLowerCase();
+    if(c.includes('livret')||c.includes('liquid')||c.includes('immob')||c.includes('fonds')||c.includes('oblig'))return 'France';
+    return 'Autre';
+  }
+  function dayChange(){
+    let abs=0,y=0;
+    state.holdings.forEach(h=>{if(h.ch24!=null){const v=holdingValue(h),yest=v/(1+(+h.ch24||0)/100);abs+=v-yest;y+=yest;}});
+    return {abs,pct:y>0?abs/y:0,has:y>0};
+  }
+  function renderMovers(){
+    const el=$('movers');if(!el)return;
+    const arr=state.holdings.filter(h=>h.ch24!=null).map(h=>({h,ch:+h.ch24}));
+    if(!arr.length){el.innerHTML=emptyBlock('Pas encore de variation','Ajoute des lignes auto (crypto/action) puis clique « Actualiser les cours ».');return;}
+    arr.sort((a,b)=>b.ch-a.ch);
+    const show=arr.length>8?[...arr.slice(0,4),...arr.slice(-4)]:arr;
+    el.innerHTML=show.map(({h,ch})=>{const v=holdingValue(h),dAbs=v-v/(1+ch/100),col=ch>=0?'var(--up)':'var(--down)';
+      return `<div class="row"><div class="chip" style="background:${CLASSCOLORS[h.assetClass]||'#869790'}"></div><div class="meta"><div class="name">${esc(h.name||h.assetClass)}</div><div class="det">${esc(h.platform||'')}</div></div><div style="text-align:right"><div class="amt num" style="color:${col}">${pctSigned(ch)}</div><div class="det" style="color:${col}">${dAbs>=0?'+':'−'}${money(Math.abs(dAbs)).replace('-','')}</div></div></div>`;}).join('');
+  }
+  function renderGeo(total){
+    const byG={};state.holdings.forEach(h=>{const g=geoOf(h);byG[g]=(byG[g]||0)+holdingValue(h);});
+    const gc={'États-Unis':'#7FC2E5','France':'#54C9A4','Japon':'#E58A6E','Chine / HK':'#E3B65A','Taïwan':'#C79BE5','Crypto':'#E59ECB','Allemagne':'#9AD06B','Autre':'#869790'};
+    let i=0;const pal=['#7FC2E5','#54C9A4','#E58A6E','#E3B65A','#C79BE5','#E59ECB','#9AD06B','#869790'],co={};
+    $('byGeo').innerHTML=breakdown(byG,total,n=>gc[n]||(co[n]||(co[n]=pal[i++%pal.length])));
+  }
   function breakdown(map,total,colorOf){
     const items=Object.entries(map).sort((a,b)=>b[1]-a[1]);
     if(!items.length)return emptyBlock('Rien pour l\'instant','Ajoute une ligne dans l\'onglet Placements.');
@@ -709,13 +775,18 @@
     const pvEl=$('kPv');pvEl.textContent=(d.pv>=0?'+':'−')+money(Math.abs(d.pv)).replace('-','');
     pvEl.style.color=d.invested>0?(d.pv>=0?'var(--up)':'var(--down)'):'var(--ink)';
     $('kPvSub').textContent=d.invested>0?pctF.format(d.pvPct)+' de performance':'—';
+    const dc=dayChange(),kd=$('kDay');
+    if(dc.has){kd.textContent=(dc.abs>=0?'+':'−')+money(Math.abs(dc.abs)).replace('-','');
+      kd.style.color=dc.abs>=0?'var(--up)':'var(--down)';$('kDaySub').textContent=pctSigned(dc.pct*100)+" aujourd'hui";}
+    else{kd.textContent='—';kd.style.color='var(--muted)';$('kDaySub').textContent='actualise les cours';}
     const byP={},byC={};
     state.holdings.forEach(h=>{const v=holdingValue(h);byP[h.platform||'Autre']=(byP[h.platform||'Autre']||0)+v;byC[h.assetClass||'Autre']=(byC[h.assetClass||'Autre']||0)+v;});
     let i=0;const palette=['#E58A6E','#E3B65A','#7FC2E5','#C79BE5','#54C9A4','#9AD06B','#E59ECB','#869790'],platColor={};
     Object.keys(byP).forEach(k=>platColor[k]=palette[i++%palette.length]);
     $('byPlatform').innerHTML=breakdown(byP,d.value,n=>platColor[n]||'#869790');
     $('byClass').innerHTML=breakdown(byC,d.value,n=>CLASSCOLORS[n]||'#869790');
-    const list=[...state.holdings].sort((a,b)=>holdingValue(b)-holdingValue(a)),el=$('topHoldings');
+    renderGeo(d.value);renderMovers();
+    const list=[...state.holdings].sort((a,b)=>holdingValue(b)-holdingValue(a)).slice(0,5),el=$('topHoldings');
     if(!list.length){el.innerHTML=emptyBlock('Aucun placement','Commence par ajouter Trade Republic, Kraken, Amundi… dans l\'onglet Placements.');return;}
     el.innerHTML=list.map(h=>{const val=holdingValue(h),inv=investedOf(h),pv=val-inv,pp=inv>0?pv/inv:0;
       const q=+h.qty||0,p=+h.price||0,detail=(q>0&&p>0)?`${esc(h.platform||'—')} · ${q} × ${money(p)}`:`${esc(h.platform||'—')} · ${esc(h.assetClass||'')}`;
