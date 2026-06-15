@@ -1,17 +1,32 @@
 const YQ = "https://query1.finance.yahoo.com/v8/finance/chart/";
 
 async function yfetch(symbol) {
-  const url = YQ + encodeURIComponent(symbol) + "?range=1mo&interval=1d";
+  const url = YQ + encodeURIComponent(symbol) + "?range=1mo&interval=15m&includePrePost=true";
   const r = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" } });
   if (!r.ok) throw new Error("yahoo " + r.status);
   const j = await r.json();
   const res = j.chart && j.chart.result && j.chart.result[0];
   if (!res) throw new Error("no data");
   const meta = res.meta;
-  const closes = ((res.indicators.quote[0] || {}).close || []).filter(x => x != null);
-  const last = meta.regularMarketPrice != null ? meta.regularMarketPrice : closes[closes.length - 1];
-  const prev = closes.length >= 2 ? closes[closes.length - 2] : meta.chartPreviousClose;
-  const wk = closes.length >= 6 ? closes[closes.length - 6] : closes[0];
+  const ts = res.timestamp || [];
+  const closeArr = ((res.indicators.quote[0] || {}).close) || [];
+  const pts = [];
+  for (let i = 0; i < ts.length; i++) {
+    if (closeArr[i] != null) pts.push([ts[i], closeArr[i]]);
+  }
+  if (!pts.length && meta.regularMarketPrice == null) throw new Error("no data");
+  const lastT = pts.length ? pts[pts.length - 1][0] : Math.floor(Date.now() / 1000);
+  const lastClose = pts.length ? pts[pts.length - 1][1] : meta.regularMarketPrice;
+  // prix le plus frais : prix live si dispo, sinon dernier échange (pré/post-marché inclus)
+  const last = meta.regularMarketPrice != null ? meta.regularMarketPrice : lastClose;
+  function closeAt(secondsAgo) {
+    const target = lastT - secondsAgo;
+    let best = null;
+    for (const [t, c] of pts) { if (t <= target) best = c; else break; }
+    return best != null ? best : (pts.length ? pts[0][1] : last);
+  }
+  const prev = closeAt(24 * 3600);
+  const wk = closeAt(7 * 24 * 3600);
   return {
     price: last,
     currency: meta.currency || "USD",
