@@ -72,10 +72,10 @@
   .card h2 .hint{text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);font-size:11.5px;margin-left:6px}
   .twocol{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:12px;margin-bottom:14px}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
   .stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:15px 17px;position:relative;overflow:hidden}
   .stat .tick{position:absolute;top:0;left:0;width:3px;height:100%;background:var(--muted)}
-  .stat.a .tick{background:var(--save)} .stat.b .tick{background:var(--in)} .stat.c .tick{background:var(--out)} .stat.d .tick{background:#7FC2E5}
+  .stat.a .tick{background:var(--save)} .stat.b .tick{background:var(--in)} .stat.c .tick{background:var(--out)}
   .stat .cap{font-size:10.5px;text-transform:uppercase;letter-spacing:.13em;color:var(--muted)}
   .stat .val{font-family:var(--mono);font-size:clamp(18px,4vw,24px);font-weight:600;margin-top:8px;letter-spacing:-.02em}
   .stat .sub{font-size:11.5px;color:var(--muted);margin-top:3px;font-family:var(--mono)}
@@ -162,28 +162,7 @@
   .toolbtns{display:flex;gap:10px;flex-wrap:wrap}
   .filechip{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}
 
-  /* ---- polish ---- */
-  ::selection{background:rgba(84,201,164,.26);color:var(--ink)}
-  .card{box-shadow:0 1px 0 rgba(255,255,255,.015), 0 14px 30px -26px rgba(0,0,0,.7);transition:border-color .2s ease, box-shadow .2s ease}
-  /* le chiffre-clé : la signature de la page */
-  .hero .total{background:linear-gradient(176deg,#F2F7F3 0%,#AFC4BB 120%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-bottom:2px}
-  .hero .cap{font-weight:500}
-  /* tuiles : légère élévation + reflet discret */
-  .stat{transition:border-color .2s ease, transform .2s ease, box-shadow .2s ease}
-  .stat::after{content:"";position:absolute;inset:0;background:radial-gradient(140px 70px at 100% 0,rgba(255,255,255,.035),transparent 70%);pointer-events:none}
-  .stat:hover{transform:translateY(-2px);border-color:#33423d;box-shadow:0 16px 34px -26px rgba(0,0,0,.85)}
-  /* lignes cliquables : affordance claire */
-  .holdrow{border-radius:11px;padding:12px 8px 12px 10px;transition:background .16s ease, transform .16s ease, box-shadow .16s ease}
-  .holdrow:hover{background:var(--surface-2);transform:translateX(3px);box-shadow:inset 0 0 0 1px var(--line)}
-  .holdrow .del{transition:transform .16s ease, color .16s ease}
-  .holdrow:hover .del{color:var(--save);transform:translateX(3px)}
-  /* onglet actif : accent menthe */
-  .rail button[aria-selected="true"]{color:var(--save)}
-  /* accessibilité clavier (plancher qualité) */
-  .btn:focus-visible,.mini:focus-visible,.rail button:focus-visible,.monthnav button:focus-visible,.seg-toggle button:focus-visible,.gbtn:focus-visible{outline:2px solid var(--save);outline-offset:2px}
-  a:focus-visible{outline:2px solid var(--save);outline-offset:3px;border-radius:5px}
-  .holdrow:focus-visible{outline:2px solid var(--save);outline-offset:2px}
-
+  /* modal */
   .modal{position:fixed;inset:0;background:rgba(4,8,7,.7);display:none;align-items:flex-start;justify-content:center;padding:24px 14px;z-index:50;overflow:auto}
   .modal.open{display:flex}
   .modal .box{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:20px;max-width:680px;width:100%;margin:auto}
@@ -282,7 +261,6 @@
     <button role="tab" aria-selected="true" data-tab="patrimoine">Patrimoine</button>
     <button role="tab" aria-selected="false" data-tab="placements">Placements</button>
     <button role="tab" aria-selected="false" data-tab="budget">Budget</button>
-    <button role="tab" aria-selected="false" data-tab="subs">Abonnements</button>
     <button role="tab" aria-selected="false" data-tab="data">Données</button>
   </div>
 
@@ -290,7 +268,6 @@
   <section class="panel active" id="patrimoine">
     <div class="stats">
       <div class="stat a"><span class="tick"></span><div class="cap">Valeur actuelle</div><div class="val num" id="kVal">—</div><div class="sub" id="kValSub"></div></div>
-      <div class="stat d"><span class="tick"></span><div class="cap">Variation du jour</div><div class="val num" id="kDay">—</div><div class="sub" id="kDaySub"></div></div>
       <div class="stat b"><span class="tick"></span><div class="cap">Total investi</div><div class="val num" id="kInv">—</div><div class="sub">apports cumulés</div></div>
       <div class="stat c"><span class="tick"></span><div class="cap">Plus / moins-value</div><div class="val num" id="kPv">—</div><div class="sub" id="kPvSub"></div></div>
     </div>
@@ -302,14 +279,10 @@
       <div id="histChart"></div>
     </div>
     <div class="twocol">
-      <div class="card"><h2>Top mouvements du jour</h2><div id="movers"></div></div>
-      <div class="card"><h2>Répartition géographique</h2><div id="byGeo"></div></div>
-    </div>
-    <div class="twocol">
       <div class="card"><h2>Répartition par plateforme</h2><div id="byPlatform"></div></div>
       <div class="card"><h2>Répartition par classe d'actif</h2><div id="byClass"></div></div>
     </div>
-    <div class="card"><h2>Plus grosses positions <span class="hint">— top 5 ; détail complet dans Placements</span></h2><div id="topHoldings"></div></div>
+    <div class="card"><h2>Mes lignes (les plus grosses d'abord)</h2><div id="topHoldings"></div></div>
   </section>
 
   <!-- PLACEMENTS -->
@@ -321,12 +294,10 @@
         <div class="field"><label>Classe d'actif</label><select id="hClass"></select></div>
         <div class="field"><label>Nom</label><input id="hName" placeholder="ex. ETF World, Bitcoin…"></div>
         <div class="field"><label>Investi (€)</label><input class="num" type="number" inputmode="decimal" step="0.01" min="0" id="hInv" placeholder="0,00"></div>
-        <div class="field"><label>Cours d'achat (PRU)</label><input class="num" type="number" inputmode="decimal" step="any" min="0" id="hPru" placeholder="optionnel"></div>
         <div class="field"><label>Quantité</label><input class="num" type="number" inputmode="decimal" step="any" min="0" id="hQty" placeholder="optionnel"></div>
         <div class="field"><label>Cours (€)</label><input class="num" type="number" inputmode="decimal" step="any" min="0" id="hPrice" placeholder="optionnel"></div>
         <div class="field"><label>ou Valeur (€)</label><input class="num" type="number" inputmode="decimal" step="0.01" min="0" id="hVal" placeholder="0,00"></div>
-        <div class="field"><label>Crypto auto <span style="text-transform:none;letter-spacing:0">(id CoinGecko)</span> <a id="hCoinHelp" href="https://www.coingecko.com" target="_blank" rel="noopener" title="Trouver l'identifiant sur CoinGecko" style="text-decoration:none;color:var(--save);cursor:pointer">ⓘ</a></label><input list="coins" id="hCoin" placeholder="ex. bitcoin"></div>
-        <div class="field"><label>Action/ETF auto <span style="text-transform:none;letter-spacing:0">(symbole Yahoo)</span> <a id="hTickerHelp" href="https://finance.yahoo.com" target="_blank" rel="noopener" title="Trouver le symbole sur Yahoo Finance" style="text-decoration:none;color:var(--save);cursor:pointer">ⓘ</a></label><input id="hTicker" placeholder="ex. NVDA, EN.PA"></div>
+        <div class="field"><label>Crypto auto <span style="text-transform:none;letter-spacing:0">(id CoinGecko)</span></label><input list="coins" id="hCoin" placeholder="ex. bitcoin"></div>
         <div class="field"><button class="btn" id="hAdd">Ajouter</button></div>
       </div>
       <datalist id="coins"></datalist>
@@ -336,10 +307,10 @@
         <option>PEA</option><option>Assurance-vie</option><option>Livret A</option><option>LDDS</option><option>Compte courant</option>
       </datalist>
       <div class="toolbtns" style="margin-top:12px">
-        <button class="btn ghost sm" id="refreshBtn">↻ Actualiser les cours</button>
-        <span class="filechip" id="refreshHint">crypto + actions/ETF récupérés automatiquement, avec variation jour & semaine</span>
+        <button class="btn ghost sm" id="refreshBtn">↻ Actualiser les cours crypto</button>
+        <span class="filechip" id="refreshHint">cours récupérés automatiquement (Bitcoin, ETH…) avec variation jour & semaine</span>
       </div>
-      <p class="notice"><b>Tout en automatique :</b> pour une <b>crypto</b>, renseigne la quantité + l'<b>id CoinGecko</b> (ex. <code>bitcoin</code>). Pour une <b>action/ETF</b>, renseigne la quantité + le <b>symbole Yahoo</b> (ex. <code>NVDA</code>, <code>EN.PA</code>, <code>6501.T</code>). Le cours, la conversion en euros et les variations se mettent à jour tout seuls. Pour les supports sans cours (Livret A, fonds euros), laisse ces champs vides et mets juste la Valeur.</p>
+      <p class="notice"><b>Crypto en automatique :</b> pour une ligne crypto, renseigne la <b>quantité</b> et l'<b>identifiant CoinGecko</b> (ex. <code>bitcoin</code>, <code>ethereum</code>, <code>solana</code>). Le cours et les variations se mettent à jour tout seuls. Pour tes actions/ETF, mets quantité + cours (à ajuster d'un chiffre de temps en temps).</p>
     </div>
     <div class="card"><h2>Toutes mes lignes</h2><div id="holdingList"></div></div>
   </section>
@@ -398,14 +369,8 @@
       </div>
       <div id="recInfo" class="notice" style="margin-top:8px"></div>
     </div>
-    <div class="card"><h2>Revenus vs dépenses <span class="hint">— 6 derniers mois</span></h2><div id="spendChart"></div></div>
-    <div class="card"><h2>Opérations du mois</h2><div id="exList"></div></div>
-  </section>
-
-  <!-- SUBS -->
-  <section class="panel" id="subs">
     <div class="card">
-      <h2>Ajouter un abonnement</h2>
+      <h2>Dépenses récurrentes <span class="hint">— tes abonnements, comptés chaque mois dans la jauge</span></h2>
       <div class="form">
         <div class="field"><label>Nom</label><input id="subName" placeholder="ex. Spotify"></div>
         <div class="field"><label>Montant (€)</label><input class="num" type="number" inputmode="decimal" step="0.01" min="0" id="subAmt" placeholder="0,00"></div>
@@ -419,7 +384,11 @@
       <div class="card"><h2>Mes abonnements</h2><div id="subList"></div></div>
       <div class="card"><h2>Prélèvements à venir</h2><div id="upcoming"></div></div>
     </div>
+    <div class="card"><h2>Revenus vs dépenses <span class="hint">— 6 derniers mois</span></h2><div id="spendChart"></div></div>
+    <div class="card"><h2>Opérations du mois</h2><div id="exList"></div></div>
   </section>
+
+  <!-- (Abonnements déplacés dans Budget : ce sont des dépenses récurrentes) -->
 
   <!-- DATA -->
   <section class="panel" id="data">
@@ -482,31 +451,6 @@
   </div>
 </div>
 
-<!-- Modal édition d'une ligne -->
-<div class="modal" id="holdModal">
-  <div class="box">
-    <h3 id="holdTitle">Modifier la ligne</h3>
-    <div class="msub">Modifie les infos puis enregistre. La valeur des lignes auto (crypto/action) se met à jour seule.</div>
-    <div class="form" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
-      <div class="field"><label>Nom</label><input id="mName"></div>
-      <div class="field"><label>Plateforme</label><input list="plats" id="mPlat"></div>
-      <div class="field"><label>Classe d'actif</label><select id="mClass"></select></div>
-      <div class="field"><label>Quantité</label><input class="num" type="number" step="any" min="0" id="mQty"></div>
-      <div class="field"><label>Cours d'achat (PRU)</label><input class="num" type="number" step="any" min="0" id="mPru" placeholder="optionnel"></div>
-      <div class="field"><label>Investi (€) <span style="text-transform:none;letter-spacing:0;color:var(--muted)" id="mInvHint"></span></label><input class="num" type="number" step="0.01" min="0" id="mInv"></div>
-      <div class="field"><label>Crypto (id CoinGecko)</label><input id="mCoin" placeholder="ex. bitcoin"></div>
-      <div class="field"><label>Action (symbole Yahoo)</label><input id="mTicker" placeholder="ex. NVDA"></div>
-      <div class="field" id="mValWrap"><label>Valeur manuelle (€)</label><input class="num" type="number" step="0.01" min="0" id="mVal" placeholder="si pas de cours auto"></div>
-    </div>
-    <div class="notice" id="mInfo" style="margin-top:10px"></div>
-    <div class="actions">
-      <button class="btn ghost" id="mDelete" style="color:var(--danger);box-shadow:inset 0 0 0 1px var(--danger)">Supprimer</button>
-      <button class="btn ghost" id="mCancel">Annuler</button>
-      <button class="btn" id="mSave">Enregistrer</button>
-    </div>
-  </div>
-</div>
-
 <div class="savebadge" id="saveBadge">Enregistré ✓</div>
 
 <script>
@@ -554,33 +498,20 @@
 
   /* ---- cours crypto (CoinGecko, sans clé) ---- */
   const COINS=['bitcoin','ethereum','solana','cardano','ripple','binancecoin','dogecoin','polkadot','litecoin','chainlink','avalanche-2','tron','polygon-ecosystem-token','uniswap','cosmos','stellar','monero','aave','arbitrum','optimism'];
-  async function refreshMarket(){
+  async function refreshPrices(){
     const ids=[...new Set(state.holdings.filter(h=>h.coinId).map(h=>h.coinId))];
-    const tickers=[...new Set(state.holdings.filter(h=>h.ticker).map(h=>h.ticker))];
-    if(!ids.length&&!tickers.length){flashTxt('Aucune ligne à actualiser');return;}
+    if(!ids.length){flashTxt('Aucune ligne crypto à actualiser');return;}
     flashTxt('Actualisation des cours…');
-    let n=0,fail=false;
-    // crypto (CoinGecko, direct)
-    if(ids.length){
-      try{
-        const url='https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&ids='+encodeURIComponent(ids.join(','))+'&price_change_percentage=24h,7d';
-        const r=await fetch(url);if(!r.ok)throw new Error('http '+r.status);
-        const data=await r.json();const byId={};data.forEach(c=>byId[c.id]=c);
-        state.holdings.forEach(h=>{const c=h.coinId&&byId[h.coinId];if(c){h.price=c.current_price;
-          h.ch24=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:c.price_change_percentage_24h;
-          h.ch7=c.price_change_percentage_7d_in_currency;n++;}});
-      }catch(e){console.error('crypto',e);fail=true;}
-    }
-    // actions/ETF (fonction Netlify -> Yahoo, converti en €)
-    if(tickers.length){
-      try{
-        const r=await fetch('/.netlify/functions/prices?symbols='+encodeURIComponent(tickers.join(',')));
-        if(!r.ok)throw new Error('http '+r.status);
-        const j=await r.json();const p=j.prices||{};
-        state.holdings.forEach(h=>{const d=h.ticker&&p[h.ticker];if(d&&d.priceEur!=null){h.price=d.priceEur;h.ch24=d.ch24;h.ch7=d.ch7;n++;}});
-      }catch(e){console.error('stocks',e);fail=true;}
-    }
-    flashTxt(n+' cours mis à jour'+(fail?' (certains indisponibles)':' ✓'));save();renderAll();
+    try{
+      const url='https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&ids='+encodeURIComponent(ids.join(','))+'&price_change_percentage=24h,7d';
+      const r=await fetch(url);if(!r.ok)throw new Error('http '+r.status);
+      const data=await r.json();const byId={};data.forEach(c=>byId[c.id]=c);
+      let n=0;
+      state.holdings.forEach(h=>{const c=h.coinId&&byId[h.coinId];if(c){h.price=c.current_price;
+        h.ch24=c.price_change_percentage_24h_in_currency!=null?c.price_change_percentage_24h_in_currency:c.price_change_percentage_24h;
+        h.ch7=c.price_change_percentage_7d_in_currency;n++;}});
+      flashTxt(n+' cours mis à jour ✓');save();renderAll();
+    }catch(e){console.error(e);flashTxt('Cours indisponibles (réessaie)');}
   }
 
   /* ---- abonnements: équivalent mensuel, annuel, prochaine échéance ---- */
@@ -601,12 +532,12 @@
 
   /* ======== CONFIG FIREBASE — colle tes valeurs ici ======== */
   const FIREBASE_CONFIG={
-    apiKey:"AIzaSyB61srKlG0Jg03G7yAV5EUQE5T0lSHGYms",
-    authDomain:"finance-calixte.firebaseapp.com",
-    projectId:"finance-calixte",
-    storageBucket:"finance-calixte.firebasestorage.app",
-    messagingSenderId:"956959552880",
-    appId:"1:956959552880:web:329d8a97df884db7524bb5"
+    apiKey:"AIzaSyD8hTayTJ2lqajGpRvVEkBP2kevEP5joxk",
+    authDomain:"nodus-f1nance.firebaseapp.com",
+    projectId:"nodus-f1nance",
+    storageBucket:"nodus-f1nance.firebasestorage.app",
+    messagingSenderId:"294454468716",
+    appId:"1:294454468716:web:71d9c70a4539137fa8b849"
   };
   /* ========================================================= */
 
@@ -663,14 +594,9 @@
     if(q>0&&p>0)return q*p;
     return +h.value||0;
   }
-  function investedOf(h){
-    const q=+h.qty||0, p=+h.pru||0;
-    if(q>0&&p>0)return q*p;
-    return +h.invested||0;
-  }
   function patData(){
     const value=state.holdings.reduce((s,h)=>s+holdingValue(h),0);
-    const invested=state.holdings.reduce((s,h)=>s+investedOf(h),0);
+    const invested=state.holdings.reduce((s,h)=>s+(+h.invested||0),0);
     return {value,invested,pv:value-invested,pvPct:invested>0?(value-invested)/invested:0};
   }
 
@@ -722,46 +648,6 @@
       e.textContent=(d.pv>=0?'▲ ':'▼ ')+money(Math.abs(d.pv))+'  ('+pctF.format(d.pvPct)+')';}
     else{e.className='pv num';e.style.color='var(--muted)';e.textContent='ajoute tes placements pour voir ta performance';}
   }
-  function geoOf(h){
-    if(h.coinId)return 'Crypto';
-    const t=(h.ticker||'').toUpperCase();
-    if(t){
-      if(t.endsWith('.PA'))return 'France';
-      if(t.endsWith('.T'))return 'Japon';
-      if(t.endsWith('.HK'))return 'Chine / HK';
-      if(t.endsWith('.TW'))return 'Taïwan';
-      if(t.endsWith('.DE')||t.endsWith('.F'))return 'Allemagne';
-      if(t.endsWith('.L'))return 'Royaume-Uni';
-      if(t.endsWith('.MI'))return 'Italie';
-      if(t.endsWith('.AS'))return 'Pays-Bas';
-      if(t.endsWith('.SW'))return 'Suisse';
-      if(/\.[A-Z]{1,3}$/.test(t))return 'International';
-      return 'États-Unis';
-    }
-    const c=(h.assetClass||'').toLowerCase();
-    if(c.includes('livret')||c.includes('liquid')||c.includes('immob')||c.includes('fonds')||c.includes('oblig'))return 'France';
-    return 'Autre';
-  }
-  function dayChange(){
-    let abs=0,y=0;
-    state.holdings.forEach(h=>{if(h.ch24!=null){const v=holdingValue(h),yest=v/(1+(+h.ch24||0)/100);abs+=v-yest;y+=yest;}});
-    return {abs,pct:y>0?abs/y:0,has:y>0};
-  }
-  function renderMovers(){
-    const el=$('movers');if(!el)return;
-    const arr=state.holdings.filter(h=>h.ch24!=null).map(h=>({h,ch:+h.ch24}));
-    if(!arr.length){el.innerHTML=emptyBlock('Pas encore de variation','Ajoute des lignes auto (crypto/action) puis clique « Actualiser les cours ».');return;}
-    arr.sort((a,b)=>b.ch-a.ch);
-    const show=arr.length>8?[...arr.slice(0,4),...arr.slice(-4)]:arr;
-    el.innerHTML=show.map(({h,ch})=>{const v=holdingValue(h),dAbs=v-v/(1+ch/100),col=ch>=0?'var(--up)':'var(--down)';
-      return `<div class="row"><div class="chip" style="background:${CLASSCOLORS[h.assetClass]||'#869790'}"></div><div class="meta"><div class="name">${esc(h.name||h.assetClass)}</div><div class="det">${esc(h.platform||'')}</div></div><div style="text-align:right"><div class="amt num" style="color:${col}">${pctSigned(ch)}</div><div class="det" style="color:${col}">${dAbs>=0?'+':'−'}${money(Math.abs(dAbs)).replace('-','')}</div></div></div>`;}).join('');
-  }
-  function renderGeo(total){
-    const byG={};state.holdings.forEach(h=>{const g=geoOf(h);byG[g]=(byG[g]||0)+holdingValue(h);});
-    const gc={'États-Unis':'#7FC2E5','France':'#54C9A4','Japon':'#E58A6E','Chine / HK':'#E3B65A','Taïwan':'#C79BE5','Crypto':'#E59ECB','Allemagne':'#9AD06B','Autre':'#869790'};
-    let i=0;const pal=['#7FC2E5','#54C9A4','#E58A6E','#E3B65A','#C79BE5','#E59ECB','#9AD06B','#869790'],co={};
-    $('byGeo').innerHTML=breakdown(byG,total,n=>gc[n]||(co[n]||(co[n]=pal[i++%pal.length])));
-  }
   function breakdown(map,total,colorOf){
     const items=Object.entries(map).sort((a,b)=>b[1]-a[1]);
     if(!items.length)return emptyBlock('Rien pour l\'instant','Ajoute une ligne dans l\'onglet Placements.');
@@ -775,38 +661,36 @@
     const pvEl=$('kPv');pvEl.textContent=(d.pv>=0?'+':'−')+money(Math.abs(d.pv)).replace('-','');
     pvEl.style.color=d.invested>0?(d.pv>=0?'var(--up)':'var(--down)'):'var(--ink)';
     $('kPvSub').textContent=d.invested>0?pctF.format(d.pvPct)+' de performance':'—';
-    const dc=dayChange(),kd=$('kDay');
-    if(dc.has){kd.textContent=(dc.abs>=0?'+':'−')+money(Math.abs(dc.abs)).replace('-','');
-      kd.style.color=dc.abs>=0?'var(--up)':'var(--down)';$('kDaySub').textContent=pctSigned(dc.pct*100)+" aujourd'hui";}
-    else{kd.textContent='—';kd.style.color='var(--muted)';$('kDaySub').textContent='actualise les cours';}
     const byP={},byC={};
     state.holdings.forEach(h=>{const v=holdingValue(h);byP[h.platform||'Autre']=(byP[h.platform||'Autre']||0)+v;byC[h.assetClass||'Autre']=(byC[h.assetClass||'Autre']||0)+v;});
     let i=0;const palette=['#E58A6E','#E3B65A','#7FC2E5','#C79BE5','#54C9A4','#9AD06B','#E59ECB','#869790'],platColor={};
     Object.keys(byP).forEach(k=>platColor[k]=palette[i++%palette.length]);
     $('byPlatform').innerHTML=breakdown(byP,d.value,n=>platColor[n]||'#869790');
     $('byClass').innerHTML=breakdown(byC,d.value,n=>CLASSCOLORS[n]||'#869790');
-    renderGeo(d.value);renderMovers();
-    const list=[...state.holdings].sort((a,b)=>holdingValue(b)-holdingValue(a)).slice(0,5),el=$('topHoldings');
+    const list=[...state.holdings].sort((a,b)=>holdingValue(b)-holdingValue(a)),el=$('topHoldings');
     if(!list.length){el.innerHTML=emptyBlock('Aucun placement','Commence par ajouter Trade Republic, Kraken, Amundi… dans l\'onglet Placements.');return;}
-    el.innerHTML=list.map(h=>{const val=holdingValue(h),inv=investedOf(h),pv=val-inv,pp=inv>0?pv/inv:0;
+    el.innerHTML=list.map(h=>{const val=holdingValue(h),pv=val-(+h.invested||0),pp=(+h.invested||0)>0?pv/h.invested:0;
       const q=+h.qty||0,p=+h.price||0,detail=(q>0&&p>0)?`${esc(h.platform||'—')} · ${q} × ${money(p)}`:`${esc(h.platform||'—')} · ${esc(h.assetClass||'')}`;
       let chip='';
       if(h.ch24!=null||h.ch7!=null){const c24=h.ch24,c7=h.ch7;
         chip=`<div class="det" style="margin-top:3px">${c24!=null?`<span style="color:${c24>=0?'var(--up)':'var(--down)'}">24h ${pctSigned(c24)}</span>`:''}${(c24!=null&&c7!=null)?' · ':''}${c7!=null?`<span style="color:${c7>=0?'var(--up)':'var(--down)'}">7j ${pctSigned(c7)}</span>`:''}</div>`;}
-      return `<div class="row"><div class="chip" style="background:${CLASSCOLORS[h.assetClass]||'#869790'}"></div><div class="meta"><div class="name">${esc(h.name||h.assetClass)}</div><div class="det">${detail}</div>${chip}</div><div style="text-align:right"><div class="amt num">${money(val)}</div>${inv>0?`<div class="pvtag ${pv>=0?'up':'down'}">${pv>=0?'+':'−'}${money(Math.abs(pv)).replace('-','')} (${pctF.format(pp)})</div>`:''}</div></div>`;}).join('');
+      return `<div class="row"><div class="chip" style="background:${CLASSCOLORS[h.assetClass]||'#869790'}"></div><div class="meta"><div class="name">${esc(h.name||h.assetClass)}</div><div class="det">${detail}</div>${chip}</div><div style="text-align:right"><div class="amt num">${money(val)}</div>${(+h.invested||0)>0?`<div class="pvtag ${pv>=0?'up':'down'}">${pv>=0?'+':'−'}${money(Math.abs(pv)).replace('-','')} (${pctF.format(pp)})</div>`:''}</div></div>`;}).join('');
   }
   function renderHoldingList(){
     const el=$('holdingList');
     if(!state.holdings.length){el.innerHTML=emptyBlock('Aucune ligne','Ajoute ton premier placement ci-dessus.');return;}
     el.innerHTML=state.holdings.map(h=>{
-      const auto=!!(h.coinId||h.ticker),val=holdingValue(h),inv=investedOf(h),pv=val-inv,pp=inv>0?pv/inv:0;
-      const src=h.coinId?('crypto · '+esc(h.coinId)):h.ticker?('action · '+esc(h.ticker)):'valeur saisie';
-      return `<div class="row holdrow" data-open="${h.id}" style="cursor:pointer">
-        <div class="chip" style="background:${CLASSCOLORS[h.assetClass]||'#869790'}"></div>
-        <div class="meta"><div class="name">${esc(h.name||h.assetClass)}${auto?' <span style="color:var(--save);font-size:10px">● auto</span>':''}</div>
-        <div class="det">${esc(h.platform||'—')} · ${esc(h.assetClass||'')} · ${src}</div></div>
-        <div style="text-align:right"><div class="amt num">${money(val)}</div>${inv>0?`<div class="pvtag ${pv>=0?'up':'down'}">${pv>=0?'+':'−'}${money(Math.abs(pv)).replace('-','')} (${pctF.format(pp)})</div>`:''}</div>
-        <span class="del" aria-hidden="true" style="pointer-events:none">›</span></div>`;}).join('');
+      const auto=!!h.coinId,coted=auto||((+h.qty||0)>0&&(+h.price||0)>0);
+      return `<div class="row"><div class="chip" style="background:${CLASSCOLORS[h.assetClass]||'#869790'}"></div>
+        <div class="meta"><div class="name">${esc(h.name||h.assetClass)}${auto?' <span style="color:var(--save);font-size:10px">● auto</span>':''}</div><div class="det">${esc(h.platform||'—')} · ${esc(h.assetClass||'')} · ${money(holdingValue(h))}</div></div>
+        <div class="edits">
+          <div class="grp"><span>Investi</span><input class="num" type="number" step="0.01" min="0" value="${+h.invested||0}" data-inv="${h.id}"></div>
+          <div class="grp"><span>Qté</span><input class="num" type="number" step="any" min="0" value="${h.qty!=null?h.qty:''}" data-qty="${h.id}" placeholder="—"></div>
+          <div class="grp"><span>Cours</span><input class="num" type="number" step="any" min="0" value="${h.price!=null?h.price:''}" data-price="${h.id}" placeholder="—" ${auto?'disabled':''}></div>
+          <div class="grp"><span>${auto?'CoinGecko':'Valeur'}</span>${auto?`<input value="${esc(h.coinId)}" data-coin="${h.id}" placeholder="id">`:`<input class="num" type="number" step="0.01" min="0" value="${coted?'':(+h.value||0)}" data-val="${h.id}" placeholder="${coted?'auto':'0'}" ${coted?'disabled':''}>`}</div>
+          <button class="mini" data-save="${h.id}">OK</button>
+        </div>
+        <button class="del" data-del-h="${h.id}" aria-label="Supprimer">×</button></div>`;}).join('');
   }
 
   /* ---- budget ---- */
@@ -1003,62 +887,16 @@
 
   $('hAdd').onclick=()=>{
     const name=$('hName').value.trim();if(!name){$('hName').focus();return;}
-    const inv=parseAmt($('hInv').value),pru=parseAmt($('hPru').value),qty=parseAmt($('hQty').value),price=parseAmt($('hPrice').value),val=parseAmt($('hVal').value);
+    const inv=parseAmt($('hInv').value),qty=parseAmt($('hQty').value),price=parseAmt($('hPrice').value),val=parseAmt($('hVal').value);
     const coin=$('hCoin').value.trim().toLowerCase();
-    const ticker=$('hTicker').value.trim().toUpperCase();
     if(qty==null&&val==null){$('hQty').focus();return;}
-    state.holdings.push({id:uid(),platform:$('hPlat').value.trim()||'Autre',assetClass:coin?'Crypto':$('hClass').value,name,invested:inv||0,pru:pru!=null?pru:null,
-      qty:qty!=null?qty:null,price:price!=null?price:null,value:val!=null?val:0,coinId:coin||null,ticker:ticker||null});
-    ['hName','hInv','hPru','hQty','hPrice','hVal','hPlat','hCoin','hTicker'].forEach(id=>$(id).value='');
+    state.holdings.push({id:uid(),platform:$('hPlat').value.trim()||'Autre',assetClass:coin?'Crypto':$('hClass').value,name,invested:inv||0,
+      qty:qty!=null?qty:null,price:price!=null?price:null,value:val!=null?val:0,coinId:coin||null});
+    ['hName','hInv','hQty','hPrice','hVal','hPlat','hCoin'].forEach(id=>$(id).value='');
     save();renderAll();
-    if(coin||ticker)refreshMarket();
+    if(coin)refreshPrices();
   };
-  $('refreshBtn').onclick=refreshMarket;
-  $('hCoinHelp').onclick=e=>{e.preventDefault();const v=$('hCoin').value.trim().toLowerCase();
-    window.open(v?'https://www.coingecko.com/fr/coins/'+encodeURIComponent(v):'https://www.coingecko.com/fr','_blank','noopener');};
-  $('hTickerHelp').onclick=e=>{e.preventDefault();const q=($('hTicker').value.trim()||$('hName').value.trim());
-    window.open(q?'https://finance.yahoo.com/lookup/?s='+encodeURIComponent(q):'https://finance.yahoo.com','_blank','noopener');};
-
-  // ---- pop-up édition d'une ligne ----
-  $('mClass').innerHTML=CLASSES.map(c=>`<option>${c}</option>`).join('');
-  let editId=null;
-  function mInvHint(){
-    const q=parseAmt($('mQty').value)||0,p=parseAmt($('mPru').value)||0;
-    if(q>0&&p>0){$('mInv').value=(q*p).toFixed(2);$('mInv').disabled=true;$('mInvHint').textContent='= quantité × PRU';}
-    else{$('mInv').disabled=false;$('mInvHint').textContent='';}
-  }
-  $('mQty').addEventListener('input',mInvHint);
-  $('mPru').addEventListener('input',mInvHint);
-  function openHoldModal(id){
-    const h=state.holdings.find(x=>x.id===id);if(!h)return;editId=id;
-    $('holdTitle').textContent=h.name||'Modifier la ligne';
-    $('mName').value=h.name||'';$('mPlat').value=h.platform||'';$('mClass').value=h.assetClass||'Actions';
-    $('mQty').value=h.qty!=null?h.qty:'';$('mPru').value=h.pru!=null?h.pru:'';
-    $('mInv').value=h.invested!=null?h.invested:'';
-    $('mCoin').value=h.coinId||'';$('mTicker').value=h.ticker||'';
-    $('mVal').value=(h.value!=null&&!h.coinId&&!h.ticker)?h.value:'';
-    $('mInfo').innerHTML=(h.coinId||h.ticker)?('Cours en automatique ('+(h.coinId?('crypto · '+esc(h.coinId)):('action · '+esc(h.ticker)))+'). Vide ces deux champs pour saisir une valeur manuelle à la place.'):'';
-    mInvHint();
-    $('holdModal').classList.add('open');
-  }
-  function closeHoldModal(){$('holdModal').classList.remove('open');editId=null;}
-  $('mCancel').onclick=closeHoldModal;
-  $('holdModal').addEventListener('click',e=>{if(e.target===$('holdModal'))closeHoldModal();});
-  $('mDelete').onclick=()=>{if(!editId)return;if(!confirm('Supprimer cette ligne ?'))return;
-    state.holdings=state.holdings.filter(x=>x.id!==editId);save();renderAll();closeHoldModal();};
-  $('mSave').onclick=()=>{const h=state.holdings.find(x=>x.id===editId);if(!h)return;
-    h.name=$('mName').value.trim()||h.name;h.platform=$('mPlat').value.trim()||'Autre';
-    const coin=$('mCoin').value.trim().toLowerCase(),tick=$('mTicker').value.trim().toUpperCase();
-    h.coinId=coin||null;h.ticker=tick||null;
-    h.assetClass=coin?'Crypto':$('mClass').value;
-    h.qty=parseAmt($('mQty').value);
-    h.pru=parseAmt($('mPru').value);
-    if(h.pru>0&&h.qty>0)h.invested=h.qty*h.pru;
-    else{const invV=parseAmt($('mInv').value);if(invV!=null)h.invested=invV;}
-    if(!coin&&!tick){const vv=parseAmt($('mVal').value);if(vv!=null)h.value=vv;}
-    save();renderAll();closeHoldModal();
-    if(h.coinId||h.ticker)refreshMarket();
-  };
+  $('refreshBtn').onclick=refreshPrices;
 
   $('prevM').onclick=()=>{curM.setMonth(curM.getMonth()-1);renderBudget();};
   $('nextM').onclick=()=>{curM.setMonth(curM.getMonth()+1);renderBudget();};
@@ -1104,14 +942,23 @@
     if(d.txcat){const t=state.tx.find(x=>x.id===d.txcat);if(!t)return;t.category=e.target.value;learnCat(t.label,e.target.value);save();renderBudget();}});
 
   // delegated
-  document.addEventListener('click',e=>{const t=e.target,row=t.closest&&t.closest('[data-open]'),d=t.dataset||{};
-    if(row){openHoldModal(row.dataset.open);return;}
-    if(d.delTx){state.tx=state.tx.filter(x=>x.id!==d.delTx);save();renderAll();}
+  document.addEventListener('click',e=>{const t=e.target,d=t.dataset||{};
+    if(d.delH){state.holdings=state.holdings.filter(x=>x.id!==d.delH);save();renderAll();}
+    else if(d.save){const h=state.holdings.find(x=>x.id===d.save);if(!h)return;
+      const gv=s=>{const n=document.querySelector(`[data-${s}="${d.save}"]`);return n?parseAmt(n.value):null;};
+      const coinN=document.querySelector(`[data-coin="${d.save}"]`);
+      const iv=gv('inv'),qy=gv('qty'),pr=gv('price'),vv=gv('val');
+      if(iv!=null)h.invested=iv;h.qty=qy;
+      if(coinN){h.coinId=coinN.value.trim().toLowerCase()||null;}
+      else if(pr!=null)h.price=pr;
+      if(!h.coinId&&!(qy>0&&pr>0)&&vv!=null)h.value=vv;
+      save();renderAll();if(h.coinId)refreshPrices();}
+    else if(d.delTx){state.tx=state.tx.filter(x=>x.id!==d.delTx);save();renderAll();}
     else if(d.delSub){state.subs=state.subs.filter(x=>x.id!==d.delSub);save();renderAll();}
     else if(d.delBud){delete state.budgets[d.delBud];save();renderBudget();}
   });
   document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const id=e.target&&e.target.id;
-    if(['hPlat','hName','hInv','hQty','hPrice','hVal','hCoin','hTicker'].includes(id))$('hAdd').click();
+    if(['hPlat','hName','hInv','hQty','hPrice','hVal'].includes(id))$('hAdd').click();
     else if(['exDate','exAmt','exLabel'].includes(id))$('exAdd').click();
     else if(['subName','subAmt','subDay'].includes(id))$('subAdd').click();
     else if(['budAmt'].includes(id))$('budSet').click();});
@@ -1124,7 +971,7 @@
     $('acctName').textContent=curAcct||'—';
     setTxType('out');renderAll();
     if(state.holdings.length){const tdy=new Date().toISOString().slice(0,10);const last=state.history[state.history.length-1];if(last&&last.date===tdy)save();}
-    if(state.holdings.some(h=>h.coinId||h.ticker))refreshMarket();
+    if(state.holdings.some(h=>h.coinId))refreshPrices();
   }
 
   async function createVault(name,code){
