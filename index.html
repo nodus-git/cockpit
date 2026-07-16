@@ -394,7 +394,8 @@
   <section class="panel" id="data">
     <div class="card">
       <h2>Sauvegarde de mes données</h2>
-      <p class="notice" style="margin-top:0">Tes données vivent dans ce navigateur. Pour ne rien perdre (et pour les transférer sur un autre appareil), <b>exporte régulièrement une sauvegarde</b> et garde le fichier en lieu sûr.</p>
+      <p class="notice" style="margin-top:0">Tes données sont chiffrées dans le cloud. Une sauvegarde exportée reste ta <b>seule protection absolue</b> — garde le fichier en lieu sûr.</p>
+      <div id="expWarn" style="display:none"></div>
       <div class="toolbtns" style="margin-top:6px">
         <button class="btn" id="expBtn">⬇ Exporter une sauvegarde</button>
         <button class="btn ghost" id="expCsvBtn">⬇ Exporter mes opérations (CSV)</button>
@@ -403,6 +404,12 @@
         <p class="notice" style="margin-top:0">Si le téléchargement ne se lance pas, copie ce texte et colle-le dans un fichier <code>.json</code> :</p>
         <textarea id="expText" readonly onclick="this.select()"></textarea>
       </div>
+    </div>
+    <div class="card">
+      <h2>Copie locale de secours <span class="hint">— automatique, sur cet appareil</span></h2>
+      <p class="notice" style="margin-top:0">À chaque enregistrement, une copie chiffrée est gardée dans ce navigateur. Elle dépanne si le cloud est perdu ou corrompu. <b>Elle ne remplace pas l'export</b> : elle disparaît si tu vides ton navigateur.</p>
+      <p class="notice" id="localInfo" style="margin-top:8px">—</p>
+      <button class="btn ghost" id="restoreLocalBtn">Restaurer la copie locale</button>
     </div>
     <div class="card">
       <h2>Restaurer / importer</h2>
@@ -550,9 +557,13 @@
   function randomBytes(n){const a=new Uint8Array(n);crypto.getRandomValues(a);return a;}
   function b64(buf){return btoa(String.fromCharCode.apply(null,new Uint8Array(buf)));}
   function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
-  async function deriveKey(pass,salt){
+  /* PBKDF2 : 210k = ancien réglage (coffres déjà créés), 600k = recommandation actuelle.
+     Le nombre utilisé est stocké dans le coffre -> aucune rupture avec l'existant. */
+  const PBKDF2_LEGACY=210000, PBKDF2_NOW=600000;
+  async function deriveKey(pass,salt,iters){
+    const it=iters||PBKDF2_LEGACY;
     const base=await crypto.subtle.importKey('raw',te.encode(pass),'PBKDF2',false,['deriveKey']);
-    return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:210000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
+    return crypto.subtle.deriveKey({name:'PBKDF2',salt:salt,iterations:it,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
   }
   async function aesEnc(key,u8){const iv=randomBytes(12);const ct=await crypto.subtle.encrypt({name:'AES-GCM',iv},key,u8);return {iv:b64(iv),ct:b64(ct)};}
   async function aesDec(key,ivB64,ctB64){const pt=await crypto.subtle.decrypt({name:'AES-GCM',iv:unb64(ivB64)},key,unb64(ctB64));return new Uint8Array(pt);}
@@ -573,20 +584,62 @@
 
   /* ---- vault / persistence ---- */
   let dek=null, curDocId=null, curAcct=null;
-  function setState(s){state={tx:s.tx||[],subs:s.subs||[],holdings:s.holdings||[],history:s.history||[],budgets:s.budgets||{},catRules:s.catRules||{},recurringIncome:s.recurringIncome||null};}
+  let baseUpdatedAt=null;      // version du cloud sur laquelle on travaille
+  let conflictOpen=false;
+  function setState(s){state={tx:s.tx||[],subs:s.subs||[],holdings:s.holdings||[],history:s.history||[],budgets:s.budgets||{},catRules:s.catRules||{},recurringIncome:s.recurringIncome||null,lastExportAt:s.lastExportAt||null};}
   async function load(){/* chargé à la connexion */}
+
+  /* copie locale chiffrée : filet de sécurité si le cloud est perdu/corrompu.
+     On stocke le même blob chiffré que le cloud -> illisible sans le code. */
+  function stashLocal(enc,at){
+    try{localStorage.setItem('cockpit_local_'+curDocId,JSON.stringify({iv:enc.iv,ct:enc.ct,at:at}));}catch(e){}
+  }
+  function localStashInfo(){
+    try{const r=localStorage.getItem('cockpit_local_'+curDocId);return r?JSON.parse(r):null;}catch(e){return null;}
+  }
+
   let saveTimer=null;
   async function save(){
     recordSnapshot();
     if(!dek||!curDocId){flashTxt('Non connecté');return;}
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(async()=>{
-      try{const enc=await aesEnc(dek,te.encode(JSON.stringify(state)));
-        await vaultRef(curDocId).set({dataIv:enc.iv,dataCt:enc.ct,updatedAt:Date.now()},{merge:true});flash();
-      }catch(e){console.error(e);flashTxt('Hors-ligne — non sauvegardé');}
-    },700);
+    saveTimer=setTimeout(()=>doSave(false),700);
   }
-  function flashOld_removed(){}
+  async function doSave(force){
+    if(!dek||!curDocId)return;
+    try{
+      const enc=await aesEnc(dek,te.encode(JSON.stringify(state)));
+      const now=Date.now(), ref=vaultRef(curDocId);
+      await fdb.runTransaction(async t=>{
+        const s=await t.get(ref);
+        if(!s.exists)throw new Error('missing');
+        const remote=s.data().updatedAt||0;
+        if(!force && baseUpdatedAt!==null && remote!==baseUpdatedAt){
+          const e=new Error('conflict');e.code='conflict';throw e;
+        }
+        t.set(ref,{dataIv:enc.iv,dataCt:enc.ct,updatedAt:now},{merge:true});
+      });
+      baseUpdatedAt=now;
+      stashLocal(enc,now);
+      flash();
+    }catch(e){
+      if(e&&e.code==='conflict'){handleConflict();return;}
+      console.error(e);flashTxt('Hors-ligne — non sauvegardé');
+    }
+  }
+  function handleConflict(){
+    if(conflictOpen)return;
+    conflictOpen=true;
+    const reload=confirm(
+      "⚠ Ton cockpit a été modifié sur un autre appareil depuis que tu as ouvert cette page.\n\n"+
+      "Pour ne rien écraser par accident, choisis :\n\n"+
+      "OK = recharger la version du cloud (ce que tu viens de saisir ici sera perdu)\n"+
+      "Annuler = garder CET écran et écraser la version du cloud"
+    );
+    conflictOpen=false;
+    if(reload){location.reload();}
+    else{doSave(true);}
+  }
 
   /* ---- holdings value (qty*price or manual) ---- */
   function holdingValue(h){
@@ -774,7 +827,7 @@
       return `<div class="row"><div class="chip" style="background:${CATCOLORS[s.category]||'var(--in)'}"></div><div class="meta"><div class="name">${esc(s.name)}</div><div class="det">${n.date.toLocaleDateString('fr-FR',{day:'2-digit',month:'short'})} · ${when}</div></div><div class="amt out num">${money(s.amount)}</div></div>`;}).join('');
   }
 
-  function renderAll(){recordSnapshot();renderHero();renderPatrimoine();renderHistory();renderHoldingList();renderBudget();renderSubs();if($('recInfo'))renderRecInfo();}
+  function renderAll(){recordSnapshot();renderHero();renderPatrimoine();renderHistory();renderHoldingList();renderBudget();renderSubs();if($('recInfo'))renderRecInfo();renderBackupInfo();}
 
   /* ---- CSV helpers ---- */
   function parseNum(s){
@@ -854,6 +907,41 @@
     try{const blob=new Blob([data],{type:'application/json'});const url=URL.createObjectURL(blob);
       const a=document.createElement('a');a.href=url;a.download='cockpit-sauvegarde-'+new Date().toISOString().slice(0,10)+'.json';
       document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);}catch(e){}
+    state.lastExportAt=Date.now();save();renderBackupInfo();
+  }
+  function renderBackupInfo(){
+    const w=$('expWarn'),li=$('localInfo');
+    if(w){
+      const last=state.lastExportAt;
+      const days=last?Math.floor((Date.now()-last)/86400000):null;
+      if(last===null||last===undefined){
+        w.style.display='block';
+        w.innerHTML='<p class="notice" style="margin:8px 0 0;color:var(--danger)"><b>Aucune sauvegarde exportée.</b> Fais-le maintenant : c\'est ce qui t\'aurait évité la mésaventure du coffre perdu.</p>';
+      }else if(days>=30){
+        w.style.display='block';
+        w.innerHTML='<p class="notice" style="margin:8px 0 0;color:var(--danger)"><b>Dernier export il y a '+days+' jours.</b> Un nouveau serait prudent.</p>';
+      }else{
+        w.style.display='block';
+        w.innerHTML='<p class="notice" style="margin:8px 0 0">Dernier export : '+new Date(last).toLocaleDateString('fr-FR',{day:'numeric',month:'long',year:'numeric'})+(days>0?' ('+days+' j)':' (aujourd\'hui)')+'.</p>';
+      }
+    }
+    if(li){
+      const o=localStashInfo();
+      li.textContent=o?('Dernière copie locale : '+new Date(o.at).toLocaleString('fr-FR',{dateStyle:'long',timeStyle:'short'})+'.'):'Aucune copie locale sur cet appareil pour l\'instant.';
+    }
+  }
+  async function restoreLocal(){
+    const o=localStashInfo();
+    if(!o){alert('Aucune copie locale sur cet appareil.');return;}
+    if(!dek){alert('Connecte-toi d\'abord.');return;}
+    if(!confirm('Restaurer la copie locale du '+new Date(o.at).toLocaleString('fr-FR')+' ?\n\nElle remplacera tes données actuelles, ici et dans le cloud.'))return;
+    try{
+      const pt=await aesDec(dek,o.iv,o.ct);
+      setState(JSON.parse(td.decode(pt)));
+      await doSave(true);
+      renderAll();renderBackupInfo();
+      alert('Copie locale restaurée.');
+    }catch(e){console.error(e);alert('Impossible de lire la copie locale (elle ne correspond pas à ce coffre).');}
   }
   function exportCsv(){
     const rows=[['date','type','montant','categorie','libelle']];
@@ -930,6 +1018,7 @@
 
   // data tab
   $('expBtn').onclick=exportBackup;
+  $('restoreLocalBtn').onclick=restoreLocal;
   $('expCsvBtn').onclick=exportCsv;
   $('impFileBtn').onclick=()=>$('impFile').click();
   $('impFile').onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('impText').value=r.result;};r.readAsText(f,'utf-8');e.target.value='';};
@@ -980,12 +1069,15 @@
     const snap=await vaultRef(curDocId).get();
     if(snap.exists){gateErr('cErr','Ce nom de coffre est déjà pris. Connecte-toi, ou choisis un autre nom.');return;}
     const dekRaw=randomBytes(32),saltCode=randomBytes(16),saltRec=randomBytes(16);
-    const kekCode=await deriveKey(code,saltCode),wrapCode=await aesEnc(kekCode,dekRaw);
-    const recovery=genRecovery(),kekRec=await deriveKey(recovery,saltRec),wrapRec=await aesEnc(kekRec,dekRaw);
+    const kekCode=await deriveKey(code,saltCode,PBKDF2_NOW),wrapCode=await aesEnc(kekCode,dekRaw);
+    const recovery=genRecovery(),kekRec=await deriveKey(recovery,saltRec,PBKDF2_NOW),wrapRec=await aesEnc(kekRec,dekRaw);
     dek=await importDek(dekRaw);setState({});
     const data=await aesEnc(dek,te.encode(JSON.stringify(state)));
-    await vaultRef(curDocId).set({v:2,saltCode:b64(saltCode),wrapCodeIv:wrapCode.iv,wrapCodeCt:wrapCode.ct,
-      saltRec:b64(saltRec),wrapRecIv:wrapRec.iv,wrapRecCt:wrapRec.ct,dataIv:data.iv,dataCt:data.ct,updatedAt:Date.now()});
+    const now=Date.now();
+    await vaultRef(curDocId).set({v:2,itCode:PBKDF2_NOW,itRec:PBKDF2_NOW,
+      saltCode:b64(saltCode),wrapCodeIv:wrapCode.iv,wrapCodeCt:wrapCode.ct,
+      saltRec:b64(saltRec),wrapRecIv:wrapRec.iv,wrapRecCt:wrapRec.ct,dataIv:data.iv,dataCt:data.ct,updatedAt:now});
+    baseUpdatedAt=now;stashLocal(data,now);
     curAcct=name;try{localStorage.setItem('cockpit_acct',name);}catch(e){}
     $('recCodeShow').textContent=recovery;showView('gv-reccode');
   }
@@ -996,14 +1088,30 @@
       const snap=await vaultRef(curDocId).get();
       if(!snap.exists){gateErr('gErr','Coffre introuvable. Vérifie le nom, ou crée-en un.');return;}
       const d=snap.data();
-      const kekCode=await deriveKey(code,unb64(d.saltCode));
+      const itC=d.itCode||d.it||PBKDF2_LEGACY;
+      const kekCode=await deriveKey(code,unb64(d.saltCode),itC);
       let dekRaw;try{dekRaw=await aesDec(kekCode,d.wrapCodeIv,d.wrapCodeCt);}catch(e){gateErr('gErr','Code incorrect.');return;}
       dek=await importDek(dekRaw);
       const pt=await aesDec(dek,d.dataIv,d.dataCt);setState(JSON.parse(td.decode(pt)));
+      baseUpdatedAt=d.updatedAt||0;
+      stashLocal({iv:d.dataIv,ct:d.dataCt},baseUpdatedAt);
       curAcct=name;try{localStorage.setItem('cockpit_acct',name);}catch(e){}
       enterApp();
+      if(itC<PBKDF2_NOW)upgradeKdf(code,dekRaw);   // renforcement silencieux
     }catch(e){console.error(e);gateErr('gErr','Erreur de connexion. Réessaie.');}
   }
+  /* Renforce un ancien coffre (210k -> 600k) sans rien demander à l'utilisateur.
+     On ne touche pas à updatedAt : seul l'emballage de la clé change, pas les données. */
+  async function upgradeKdf(code,dekRaw){
+    try{
+      const saltCode=randomBytes(16);
+      const kek=await deriveKey(code,saltCode,PBKDF2_NOW);
+      const wrap=await aesEnc(kek,dekRaw);
+      await vaultRef(curDocId).set({itCode:PBKDF2_NOW,saltCode:b64(saltCode),
+        wrapCodeIv:wrap.iv,wrapCodeCt:wrap.ct},{merge:true});
+    }catch(e){console.warn('upgrade kdf ignoré',e);}
+  }
+
   async function recoverVault(name,rec,newCode){
     gateErr('rErr','');
     try{
@@ -1011,13 +1119,14 @@
       const snap=await vaultRef(curDocId).get();
       if(!snap.exists){gateErr('rErr','Coffre introuvable.');return;}
       const d=snap.data();
-      const kekRec=await deriveKey(rec.trim().toUpperCase(),unb64(d.saltRec));
+      const kekRec=await deriveKey(rec.trim().toUpperCase(),unb64(d.saltRec),d.itRec||d.it||PBKDF2_LEGACY);
       let dekRaw;try{dekRaw=await aesDec(kekRec,d.wrapRecIv,d.wrapRecCt);}catch(e){gateErr('rErr','Code de secours invalide.');return;}
       dek=await importDek(dekRaw);
       const pt=await aesDec(dek,d.dataIv,d.dataCt);setState(JSON.parse(td.decode(pt)));
+      baseUpdatedAt=d.updatedAt||0;
       // redéfinir le code
-      const saltCode=randomBytes(16),kekCode=await deriveKey(newCode,saltCode),wrapCode=await aesEnc(kekCode,dekRaw);
-      await vaultRef(curDocId).set({saltCode:b64(saltCode),wrapCodeIv:wrapCode.iv,wrapCodeCt:wrapCode.ct,updatedAt:Date.now()},{merge:true});
+      const saltCode=randomBytes(16),kekCode=await deriveKey(newCode,saltCode,PBKDF2_NOW),wrapCode=await aesEnc(kekCode,dekRaw);
+      await vaultRef(curDocId).set({itCode:PBKDF2_NOW,saltCode:b64(saltCode),wrapCodeIv:wrapCode.iv,wrapCodeCt:wrapCode.ct},{merge:true});
       curAcct=name;try{localStorage.setItem('cockpit_acct',name);}catch(e){}
       enterApp();
     }catch(e){console.error(e);gateErr('rErr','Erreur. Réessaie.');}
@@ -1025,10 +1134,12 @@
   async function changeCode(newCode){
     const snap=await vaultRef(curDocId).get();const d=snap.data();
     // on a déjà dek en mémoire : on ré-emballe la clé avec le nouveau code
-    const dekRaw=await aesDec(await deriveKey(prompt('Confirme ton code actuel pour changer :')||'',unb64(d.saltCode)),d.wrapCodeIv,d.wrapCodeCt).catch(()=>null);
+    const cur=prompt('Confirme ton code actuel pour changer :');
+    if(cur===null)return;
+    const dekRaw=await aesDec(await deriveKey(cur||'',unb64(d.saltCode),d.itCode||d.it||PBKDF2_LEGACY),d.wrapCodeIv,d.wrapCodeCt).catch(()=>null);
     if(!dekRaw){alert('Code actuel incorrect.');return;}
-    const saltCode=randomBytes(16),kekCode=await deriveKey(newCode,saltCode),wrapCode=await aesEnc(kekCode,dekRaw);
-    await vaultRef(curDocId).set({saltCode:b64(saltCode),wrapCodeIv:wrapCode.iv,wrapCodeCt:wrapCode.ct,updatedAt:Date.now()},{merge:true});
+    const saltCode=randomBytes(16),kekCode=await deriveKey(newCode,saltCode,PBKDF2_NOW),wrapCode=await aesEnc(kekCode,dekRaw);
+    await vaultRef(curDocId).set({itCode:PBKDF2_NOW,saltCode:b64(saltCode),wrapCodeIv:wrapCode.iv,wrapCodeCt:wrapCode.ct},{merge:true});
     alert('Code mis à jour.');
   }
 
